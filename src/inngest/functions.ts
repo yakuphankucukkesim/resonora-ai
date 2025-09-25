@@ -6,11 +6,8 @@ import { ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 export const processVideo = inngest.createFunction(
   {
     id: "process-video",
+    name: "Process Video",
     retries: 1,
-    concurrency: {
-      limit: 1,
-      key: "event.data.userId",
-    },
   },
   { event: "process-video-events" },
   async ({ event, step }) => {
@@ -128,15 +125,20 @@ export const processVideo = inngest.createFunction(
         });
       }
     } catch (error) {
-      console.error(error);
-      await db.uploadedFile.update({
-        where: {
-          id: uploadedFileId,
-        },
-        data: {
-          status: "failed",
-        },
+      console.error("Error processing video:", error);
+      
+      await step.run("set-status-failed", async () => {
+        await db.uploadedFile.update({
+          where: {
+            id: uploadedFileId,
+          },
+          data: {
+            status: "failed",
+          },
+        });
       });
+      
+      throw error; // Re-throw to let Inngest handle retries
     }
   },
 );
@@ -158,3 +160,49 @@ async function listS3ObjectsByPrefix(prefix: string) {
   const response = await s3Client.send(listCommand);
   return response.Contents?.map((item) => item.Key).filter(Boolean) ?? [];
 }
+
+// Test function for debugging
+export const testFunction = inngest.createFunction(
+  {
+    id: "test-function",
+    name: "Test Function",
+    retries: 1,
+  },
+  { event: "test-event" },
+  async ({ event, step }) => {
+    console.log("Test function triggered with event:", event);
+    
+    await step.run("test-step", async () => {
+      console.log("Test step executed successfully");
+      return { success: true, timestamp: new Date().toISOString() };
+    });
+    
+    return { success: true };
+  },
+);
+
+// Simple function to test basic functionality
+export const simpleTest = inngest.createFunction(
+  {
+    id: "simple-test",
+    name: "Simple Test",
+  },
+  { event: "simple-test" },
+  async ({ event }) => {
+    console.log("Simple test function executed:", event);
+    return { message: "Simple test completed" };
+  },
+);
+
+// Minimal function to test triggers
+export const minimalTest = inngest.createFunction(
+  {
+    id: "minimal-test",
+    name: "Minimal Test",
+  },
+  { event: "minimal-test" },
+  async ({ event }) => {
+    console.log("Minimal test function executed:", event);
+    return { success: true };
+  },
+);

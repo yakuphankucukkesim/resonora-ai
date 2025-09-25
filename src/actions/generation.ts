@@ -39,6 +39,32 @@ export async function processVideo(uploadedFileId: string) {
   revalidatePath("/dashboard");
 }
 
+export async function testInngestFunction() {
+  try {
+    await inngest.send({
+      name: "test-event",
+      data: { message: "Test message from frontend" },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending test event:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function testMinimalFunction() {
+  try {
+    await inngest.send({
+      name: "minimal-test",
+      data: { message: "Minimal test from frontend" },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending minimal test event:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
 export async function getClipPlayUrl(
   clipId: string,
 ): Promise<{ succes: boolean; url?: string; error?: string }> {
