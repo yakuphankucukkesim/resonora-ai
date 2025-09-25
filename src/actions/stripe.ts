@@ -18,81 +18,89 @@ const PRICE_IDS: Record<PriceId, string> = {
 };
 
 export async function createCheckoutSession(priceId: PriceId) {
-  const serverSession = await auth();
-
-  if (!serverSession?.user?.id) {
-    throw new Error("User not authenticated");
-  }
-
-  const user = await db.user.findUnique({
-    where: {
-      id: serverSession.user.id,
-    },
-    select: { stripeCustomerId: true, email: true, name: true },
-  });
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  let stripeCustomerId = user.stripeCustomerId;
-
-  // Create Stripe customer if one doesn't exist
-  if (!stripeCustomerId) {
-    try {
-      const stripeCustomer = await stripe.customers.create({
-        email: user.email ?? undefined,
-        name: user.name ?? undefined,
-        metadata: {
-          userId: serverSession.user.id,
-        },
-      });
-
-      stripeCustomerId = stripeCustomer.id;
-
-      // Update user with the new Stripe customer ID
-      await db.user.update({
-        where: { id: serverSession.user.id },
-        data: { stripeCustomerId },
-      });
-
-      console.log("Created new Stripe customer", {
-        customerId: stripeCustomerId,
-        userId: serverSession.user.id,
-      });
-    } catch (error) {
-      console.error("Error creating Stripe customer", error);
-      throw new Error("Failed to create Stripe customer");
-    }
-  }
-
   try {
-    const session = await stripe.checkout.sessions.create({
-      line_items: [{ price: PRICE_IDS[priceId], quantity: 1 }],
-      customer: stripeCustomerId,
-      mode: "payment",
-      success_url: `${env.BASE_URL}/dashboard?success=true`,
-      cancel_url: `${env.BASE_URL}/dashboard?canceled=true`,
-    });
+    const serverSession = await auth();
 
-    if (!session.url) {
-      console.error("Stripe session created without URL", { sessionId: session.id });
-      throw new Error("Failed to create session URL");
+    if (!serverSession?.user?.id) {
+      console.error("No authenticated user found", { session: serverSession });
+      throw new Error("User not authenticated");
     }
 
-    console.log("Stripe checkout session created", {
-      sessionId: session.id,
-      customerId: stripeCustomerId,
-      price: PRICE_IDS[priceId],
+    console.log("Creating checkout session for user", { userId: serverSession.user.id, priceId });
+
+    const user = await db.user.findUnique({
+      where: {
+        id: serverSession.user.id,
+      },
+      select: { stripeCustomerId: true, email: true, name: true },
     });
 
-    redirect(session.url);
-  } catch (err) {
-    // Don't log NEXT_REDIRECT as an error - it's expected behavior
-    if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) {
-      throw err; // Re-throw redirect errors without logging
+    if (!user) {
+      throw new Error("User not found");
     }
-    console.error("Error creating Stripe session", err);
-    throw err;
+
+    let stripeCustomerId = user.stripeCustomerId;
+
+    // Create Stripe customer if one doesn't exist
+    if (!stripeCustomerId) {
+      try {
+        const stripeCustomer = await stripe.customers.create({
+          email: user.email ?? undefined,
+          name: user.name ?? undefined,
+          metadata: {
+            userId: serverSession.user.id,
+          },
+        });
+
+        stripeCustomerId = stripeCustomer.id;
+
+        // Update user with the new Stripe customer ID
+        await db.user.update({
+          where: { id: serverSession.user.id },
+          data: { stripeCustomerId },
+        });
+
+        console.log("Created new Stripe customer", {
+          customerId: stripeCustomerId,
+          userId: serverSession.user.id,
+        });
+      } catch (error) {
+        console.error("Error creating Stripe customer", error);
+        throw new Error("Failed to create Stripe customer");
+      }
+    }
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        line_items: [{ price: PRICE_IDS[priceId], quantity: 1 }],
+        customer: stripeCustomerId,
+        mode: "payment",
+        success_url: `${env.BASE_URL}/dashboard?success=true`,
+        cancel_url: `${env.BASE_URL}/dashboard?canceled=true`,
+      });
+
+      if (!session.url) {
+        console.error("Stripe session created without URL", { sessionId: session.id });
+        throw new Error("Failed to create session URL");
+      }
+
+      console.log("Stripe checkout session created", {
+        sessionId: session.id,
+        customerId: stripeCustomerId,
+        price: PRICE_IDS[priceId],
+      });
+
+      redirect(session.url);
+    } catch (err) {
+      // Don't log NEXT_REDIRECT as an error - it's expected behavior
+      if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) {
+        throw err; // Re-throw redirect errors without logging
+      }
+      console.error("Error creating Stripe session", err);
+      throw err;
+    }
+  } catch (error) {
+    console.error("Unexpected error in createCheckoutSession", error);
+    throw new Error("Failed to create checkout session");
   }
 }
