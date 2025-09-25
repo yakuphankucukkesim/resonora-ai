@@ -51,39 +51,42 @@ export function DashboardClient({
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
-  // Success olduğunda sayfayı yenile
+  // Success olduğunda sadece URL'den parametreyi kaldır ve router.refresh() kullan
   useEffect(() => {
     if (success) {
-      // URL'den success parametresini kaldır ve sayfayı yenile
+      // URL'den success parametresini kaldır
       const url = new URL(window.location.href);
       url.searchParams.delete('success');
       window.history.replaceState({}, '', url.toString());
-      window.location.reload();
+      // Sayfa yenileme yerine router.refresh() kullan
+      router.refresh();
     }
-  }, [success]);
+  }, [success, router]);
 
-  // Sayfa yüklendiğinde ve billing sayfasından döndükten sonra refresh yap
+  // Sadece billing sayfasından döndükten sonra refresh yap
   useEffect(() => {
     const handleFocus = () => {
-      // Tam sayfa yenileme
-      window.location.reload();
-    };
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // Sayfa görünür olduğunda refresh
-        window.location.reload();
+      // Sadece billing sayfasından döndükten sonra refresh yap
+      // URL'de billing parametresi varsa refresh yap
+      const url = new URL(window.location.href);
+      if (url.pathname.includes('/billing')) {
+        return; // Billing sayfasındayken refresh yapma
+      }
+      // Billing sayfasından döndükten sonra sadece bir kez refresh yap
+      const lastRefresh = sessionStorage.getItem('lastRefresh');
+      const now = Date.now();
+      if (!lastRefresh || now - parseInt(lastRefresh) > 5000) { // 5 saniye içinde tekrar refresh yapma
+        sessionStorage.setItem('lastRefresh', now.toString());
+        router.refresh();
       }
     };
 
     window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [router]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -102,11 +105,20 @@ export function DashboardClient({
     setUploading(true);
 
     try {
+      // Dosya boyutunu kontrol et
+      if (file.size > 500 * 1024 * 1024) {
+        throw new Error("File size must be less than 500MB");
+      }
+
+      // Upload URL'ini al
       const { success, signedUrl, uploadedFileId } = await generateUploadUrl({
         filename: file.name,
         contentType: file.type,
       });
+      
       if (!success) throw new Error("Failed to get upload URL");
+
+      // Dosyayı S3'e yükle
       const uploadResponse = await fetch(signedUrl, {
         method: "PUT",
         body: file,
@@ -115,12 +127,19 @@ export function DashboardClient({
         },
       });
 
-      if (!uploadResponse.ok)
-        throw new Error(`Upload filled with status: ${uploadResponse.status}`);
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        throw new Error(`Upload failed with status: ${uploadResponse.status} - ${errorText}`);
+      }
 
+      // Video işleme sürecini başlat
       await processVideo(uploadedFileId);
 
+      // Başarılı yükleme sonrası
       setFiles([]);
+      
+      // Sayfayı yenile (sadece bu durumda)
+      router.refresh();
 
       toast.success("Video uploaded successfully", {
         description:
@@ -128,10 +147,10 @@ export function DashboardClient({
         duration: 5000,
       });
     } catch (error) {
-      console.error(error);
+      console.error("Upload error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast.error("Upload failed", {
-        description:
-          "There was a problem uploading your video. Please try again",
+        description: errorMessage,
       });
     } finally {
       setUploading(false);
@@ -176,10 +195,7 @@ export function DashboardClient({
             </div>
           </div>
           <div className="flex flex-col items-center space-y-4">
-            <Link href="/dashboard/billing" onClick={() => {
-              // Billing sayfasına giderken tam sayfa yenileme yap
-              setTimeout(() => window.location.reload(), 500);
-            }}>
+            <Link href="/dashboard/billing">
               <Button className="bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30 shadow-lg btn-animate text-lg px-8 py-4">
                 💳 Buy Credits
               </Button>

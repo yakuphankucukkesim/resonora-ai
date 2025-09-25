@@ -2,6 +2,5 @@ import { Inngest } from "inngest";
 
 // Create a client to send and receive events
 export const inngest = new Inngest({ 
-  id: "resonora-ai",
-  name: "Resonora AI"
+  id: "resonora-ai"
 });
