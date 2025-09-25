@@ -22,14 +22,14 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Error caught by boundary:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        this.props.fallback || (
+        this.props.fallback ?? (
           <div className="flex min-h-[400px] items-center justify-center">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-white mb-4">
