@@ -5,6 +5,8 @@
 Resonora AI is an AI tool that automatically **clips podcast content** and **adds subtitles**.  
 Our goal is to help creators turn long podcast episodes into short, shareable clips effortlessly. 🚀
 
+You can see this site: resonora-ai.vercel.app
+
 ---
 
 ## ✨ Features
