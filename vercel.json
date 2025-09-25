@@ -1,12 +1,4 @@
 {
-  "functions": {
-    "src/actions/s3.ts": {
-      "maxDuration": 30
-    },
-    "src/actions/generation.ts": {
-      "maxDuration": 30
-    }
-  },
   "headers": [
     {
       "source": "/api/(.*)",

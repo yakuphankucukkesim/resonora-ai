@@ -13,12 +13,6 @@ const config = {
   images: {
     domains: [],
   },
-  // Dosya yükleme için gerekli ayarlar
-  api: {
-    bodyParser: {
-      sizeLimit: '500mb',
-    },
-  },
 };
 
 export default config;
