@@ -24,7 +24,7 @@ export async function createCheckoutSession(priceId: PriceId) {
     throw new Error("User not authenticated");
   }
 
-  let user = await db.user.findUnique({
+  const user = await db.user.findUnique({
     where: {
       id: serverSession.user.id,
     },
@@ -41,8 +41,8 @@ export async function createCheckoutSession(priceId: PriceId) {
   if (!stripeCustomerId) {
     try {
       const stripeCustomer = await stripe.customers.create({
-        email: user.email || undefined,
-        name: user.name || undefined,
+        email: user.email ?? undefined,
+        name: user.name ?? undefined,
         metadata: {
           userId: serverSession.user.id,
         },
