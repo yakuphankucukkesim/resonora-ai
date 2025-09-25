@@ -71,12 +71,25 @@ export async function createCheckoutSession(priceId: PriceId) {
     }
 
     try {
+      // Validate and ensure BASE_URL has proper scheme
+      if (!env.BASE_URL) {
+        throw new Error("BASE_URL environment variable is not set");
+      }
+      
+      // Ensure the URL has a proper scheme
+      let baseUrl = env.BASE_URL;
+      if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+        baseUrl = `https://${baseUrl}`;
+      }
+      
+      console.log("Using base URL for Stripe:", baseUrl);
+      
       const session = await stripe.checkout.sessions.create({
         line_items: [{ price: PRICE_IDS[priceId], quantity: 1 }],
         customer: stripeCustomerId,
         mode: "payment",
-        success_url: `${env.BASE_URL}/dashboard?success=true`,
-        cancel_url: `${env.BASE_URL}/dashboard?canceled=true`,
+        success_url: `${baseUrl}/dashboard?success=true`,
+        cancel_url: `${baseUrl}/dashboard?canceled=true`,
       });
 
       if (!session.url) {
