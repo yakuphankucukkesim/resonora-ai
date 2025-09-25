@@ -3,6 +3,7 @@
 import type { VariantProps } from "class-variance-authority";
 import { ArrowLeftIcon, CheckIcon } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { createCheckoutSession, type PriceId } from "~/actions/stripe";
 import { Button, type buttonVariants } from "~/components/ui/button";
 
@@ -63,6 +64,23 @@ const plans: PricingPlan[] = [
 ];
 
 function PricingCard({ plan }: { plan: PricingPlan }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await createCheckoutSession(plan.priceId);
+    } catch (err) {
+      console.error("Error creating checkout session:", err);
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="relative">
       {plan.isPopular && (
@@ -113,10 +131,12 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
         </ul>
       </CardContent>
       <CardFooter className="relative z-10 pt-0">
-        <form
-          action={() => createCheckoutSession(plan.priceId)}
-          className="w-full"
-        >
+        <div className="w-full space-y-2">
+          {error && (
+            <div className="text-red-400 text-sm text-center bg-red-500/20 rounded-lg p-2">
+              {error}
+            </div>
+          )}
           <Button 
             variant={plan.buttonVariant} 
             className={cn(
@@ -125,11 +145,12 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
                 ? "bg-gradient-to-r text-white border-0 shadow-lg hover:shadow-xl hover:bg-gradient-to-r hover:from-white/20 hover:to-blue-500/20 hover:border-blue-400 hover:scale-105" 
                 : "bg-white/10 text-white border-white/20 hover:bg-gradient-to-r hover:from-white/20 hover:to-blue-500/20 hover:border-blue-400 hover:scale-105"
             )}
-            type="submit"
+            onClick={handleSubmit}
+            disabled={isLoading}
           >
-            {plan.buttonText}
+            {isLoading ? "Processing..." : plan.buttonText}
           </Button>
-        </form>
+        </div>
       </CardFooter>
     </Card>
     </div>

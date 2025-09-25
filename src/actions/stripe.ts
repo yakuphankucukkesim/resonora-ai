@@ -20,21 +20,56 @@ const PRICE_IDS: Record<PriceId, string> = {
 export async function createCheckoutSession(priceId: PriceId) {
   const serverSession = await auth();
 
-  const user = await db.user.findUniqueOrThrow({
+  if (!serverSession?.user?.id) {
+    throw new Error("User not authenticated");
+  }
+
+  let user = await db.user.findUnique({
     where: {
-      id: serverSession?.user.id,
+      id: serverSession.user.id,
     },
-    select: { stripeCustomerId: true },
+    select: { stripeCustomerId: true, email: true, name: true },
   });
 
-  if (!user.stripeCustomerId) {
-    throw new Error("User has no stripeCustomerId");
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  let stripeCustomerId = user.stripeCustomerId;
+
+  // Create Stripe customer if one doesn't exist
+  if (!stripeCustomerId) {
+    try {
+      const stripeCustomer = await stripe.customers.create({
+        email: user.email || undefined,
+        name: user.name || undefined,
+        metadata: {
+          userId: serverSession.user.id,
+        },
+      });
+
+      stripeCustomerId = stripeCustomer.id;
+
+      // Update user with the new Stripe customer ID
+      await db.user.update({
+        where: { id: serverSession.user.id },
+        data: { stripeCustomerId },
+      });
+
+      console.log("Created new Stripe customer", {
+        customerId: stripeCustomerId,
+        userId: serverSession.user.id,
+      });
+    } catch (error) {
+      console.error("Error creating Stripe customer", error);
+      throw new Error("Failed to create Stripe customer");
+    }
   }
 
   try {
     const session = await stripe.checkout.sessions.create({
       line_items: [{ price: PRICE_IDS[priceId], quantity: 1 }],
-      customer: user.stripeCustomerId,
+      customer: stripeCustomerId,
       mode: "payment",
       success_url: `${env.BASE_URL}/dashboard?success=true`,
       cancel_url: `${env.BASE_URL}/dashboard?canceled=true`,
@@ -47,7 +82,7 @@ export async function createCheckoutSession(priceId: PriceId) {
 
     console.log("Stripe checkout session created", {
       sessionId: session.id,
-      customerId: user.stripeCustomerId,
+      customerId: stripeCustomerId,
       price: PRICE_IDS[priceId],
     });
 
