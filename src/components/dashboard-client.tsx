@@ -133,19 +133,29 @@ export function DashboardClient({
       }
 
       // Video işleme sürecini başlat
-      await processVideo(uploadedFileId);
+      try {
+        await processVideo(uploadedFileId);
+        
+        // Başarılı yükleme sonrası
+        setFiles([]);
+        
+        // Sayfayı yenile (sadece bu durumda)
+        router.refresh();
 
-      // Başarılı yükleme sonrası
-      setFiles([]);
-      
-      // Sayfayı yenile (sadece bu durumda)
-      router.refresh();
-
-      toast.success("Video uploaded successfully", {
-        description:
-          "Your video has been scheduled for processing. Check the status below.",
-        duration: 5000,
-      });
+        toast.success("Video uploaded successfully", {
+          description:
+            "Your video has been scheduled for processing. Check the status below.",
+          duration: 5000,
+        });
+      } catch (processError) {
+        console.error("Video processing error:", processError);
+        // Upload başarılı ama işleme hatası - kullanıcıya bilgi ver
+        toast.warning("Video uploaded but processing failed", {
+          description:
+            "Your video was uploaded but there was an issue with processing. Please try again or contact support.",
+          duration: 7000,
+        });
+      }
     } catch (error) {
       console.error("Upload error:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
