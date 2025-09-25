@@ -113,6 +113,10 @@ export async function createCheckoutSession(priceId: PriceId) {
       throw err;
     }
   } catch (error) {
+    // Don't treat NEXT_REDIRECT as an error - it's expected behavior
+    if (error instanceof Error && (error.message.includes('NEXT_REDIRECT') || error.digest?.includes('NEXT_REDIRECT'))) {
+      throw error; // Re-throw redirect errors without logging
+    }
     console.error("Unexpected error in createCheckoutSession", error);
     throw new Error("Failed to create checkout session");
   }
